@@ -161,3 +161,20 @@ booktitle={IEEE Conference on Computer Vision and Pattern Recognition},
 year={2024}
 }
 ```
+
+
+## Synthetic cross-modal fine-tuning (no depth / pose)
+If your remote sensing data does not have reliable depth, intrinsics and poses, you can fine-tune with synthetic warp supervision.
+
+1. Prepare a text manifest with one already co-registered cross-modal pair per line:
+   ```text
+   path/to/im_A path/to/im_B
+   ```
+2. Use `romatch.datasets.SyntheticWarpPairs` to sample random affine + elastic deformations and generate:
+   - `im_A` (synthetically warped image),
+   - `im_B` (target image),
+   - `gt_warp` (pixel correspondences in normalized `[-1,1]` coordinates),
+   - `gt_prob` (valid mask).
+3. `RobustLosses` now supports `gt_warp`/`gt_prob` directly, and falls back to depth-based supervision when not provided.
+
+This enables RoMa fine-tuning with a data engine that synthesizes large-scale cross-modal pairs.
