@@ -40,6 +40,30 @@ class RobustLosses(nn.Module):
         self.alpha = alpha
         self.c = c
 
+    def _get_gt(self, batch, h, w):
+        if "gt_warp" in batch and "gt_prob" in batch:
+            gt_warp = batch["gt_warp"].permute(0, 3, 1, 2)
+            if gt_warp.shape[-2:] != (h, w):
+                gt_warp = F.interpolate(gt_warp, size=(h, w), mode="bilinear", align_corners=False)
+            gt_warp = gt_warp.permute(0, 2, 3, 1)
+
+            gt_prob = batch["gt_prob"][:, None]
+            if gt_prob.shape[-2:] != (h, w):
+                gt_prob = F.interpolate(gt_prob.float(), size=(h, w), mode="nearest-exact")
+            gt_prob = gt_prob[:, 0]
+            return gt_warp.float(), gt_prob.float()
+
+        gt_warp, gt_prob = get_gt_warp(
+            batch["im_A_depth"],
+            batch["im_B_depth"],
+            batch["T_1to2"],
+            batch["K1"],
+            batch["K2"],
+            H=h,
+            W=w,
+        )
+        return gt_warp.float(), gt_prob.float()
+
     def gm_cls_loss(self, x2, prob, scale_gm_cls, gm_certainty, scale):
         with torch.no_grad():
             B, C, H, W = scale_gm_cls.shape
@@ -123,17 +147,7 @@ class RobustLosses(nn.Module):
             else:
                 # _ = 1
                 b, _, h, w = scale_certainty.shape
-            gt_warp, gt_prob = get_gt_warp(                
-            batch["im_A_depth"],
-            batch["im_B_depth"],
-            batch["T_1to2"],
-            batch["K1"],
-            batch["K2"],
-            H=h,
-            W=w,
-        )
-            x2 = gt_warp.float()
-            prob = gt_prob
+            x2, prob = self._get_gt(batch, h, w)
             
             if self.local_largest_scale >= scale:
                 prob = prob * (
